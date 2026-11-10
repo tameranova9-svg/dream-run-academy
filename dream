@@ -1,0 +1,690 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dream Run Academy 3D</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+font-family:Arial,sans-serif;
+background:#17152c;color:white;
+overflow:hidden
+}
+button{
+border:0;border-radius:13px;
+padding:11px 16px;
+font-weight:bold;cursor:pointer
+}
+#game{position:fixed;inset:0}
+canvas{display:block}
+.hud{
+position:fixed;z-index:3;
+top:12px;left:12px;right:12px;
+display:flex;gap:8px;
+justify-content:space-between;
+flex-wrap:wrap;pointer-events:none
+}
+.stat{
+background:#17152cce;
+border:1px solid #ffffff35;
+border-radius:14px;
+padding:9px 12px;font-size:13px
+}
+.stat b{color:#ffd6ed}
+.hud button{pointer-events:auto}
+#quiz{
+position:fixed;z-index:5;
+left:50%;top:50%;
+transform:translate(-50%,-50%);
+width:min(92vw,510px);
+background:#fff9f3;color:#30254d;
+border:3px solid #ffb5d9;
+border-radius:23px;padding:22px;
+display:none
+}
+#quiz h2{color:#9a5ca5}
+#question{font-size:18px;font-weight:bold;margin:15px 0}
+.answers{
+display:grid;grid-template-columns:1fr 1fr;gap:9px
+}
+.answers button{
+background:#f0e9ff;color:#493a72;
+text-align:left
+}
+#feedback{min-height:25px;font-weight:bold;margin-top:12px}
+#overlay{
+position:fixed;z-index:8;inset:0;
+background:linear-gradient(135deg,#241a43ef,#8b4e87df);
+display:flex;align-items:center;
+justify-content:center;padding:20px
+}
+.panel{
+width:min(92vw,540px);
+background:#fff8f1;color:#38284e;
+border-radius:26px;padding:27px;
+text-align:center
+}
+.panel h1{font-size:35px;color:#a84e9b;margin:12px}
+.panel p{line-height:1.6;margin:12px 0}
+.primary{
+background:linear-gradient(90deg,#ff8fc7,#9b83ff);
+color:white;font-size:16px;padding:14px 24px
+}
+.small{font-size:12px;color:#766b82}
+.controls{
+position:fixed;z-index:4;
+bottom:16px;left:0;right:0;
+display:flex;justify-content:space-between;
+padding:0 18px;pointer-events:none
+}
+.pad{display:flex;gap:10px}
+.controls button{
+pointer-events:auto;width:58px;height:54px;
+background:#fff9;color:#392b58;font-size:20px
+}
+#toast{
+position:fixed;z-index:6;top:80px;
+left:50%;transform:translateX(-50%);
+background:#201a39e8;padding:10px 16px;
+border-radius:20px;display:none
+}
+#progress{
+height:7px;background:#e6d9f3;
+border-radius:8px;overflow:hidden;margin-top:12px
+}
+#bar{height:100%;width:0;background:#ff8fc7}
+@media(max-width:520px){
+.answers{grid-template-columns:1fr}
+#quiz{padding:17px}
+.controls button{width:52px;height:50px}
+}
+</style>
+</head>
+<body>
+
+<div id="game"></div>
+
+<div class="hud">
+<div class="stat">⭐ Skor: <b id="score">0</b></div>
+<div class="stat">🪙 Koin: <b id="coins">0</b></div>
+<div class="stat">❤️ Nyawa: <b id="lives">3</b></div>
+<div class="stat">🌎 Dunia: <b id="world">1/5</b></div>
+<div class="stat">⏱ <b id="time">05:00</b></div>
+<button onclick="togglePause()">Ⅱ</button>
+<button onclick="toggleSound()" id="soundBtn">🔊</button>
+</div>
+
+<div id="quiz">
+<div class="small" id="qmeta"></div>
+<h2>✨ Tantangan Pintar!</h2>
+<div id="question"></div>
+<div class="answers" id="answers"></div>
+<div id="feedback"></div>
+<div id="progress"><div id="bar"></div></div>
+</div>
+
+<div id="toast"></div>
+
+<div class="controls">
+<div class="pad">
+<button onclick="move(-1)">◀</button>
+<button onclick="move(1)">▶</button>
+</div>
+<div class="pad">
+<button onclick="jump()">⬆</button>
+<button onclick="duck()">⬇</button>
+</div>
+</div>
+
+<div id="overlay">
+<div class="panel" id="intro">
+<div style="font-size:55px">🎀🏃‍♀️⭐</div>
+<h1>Dream Run Academy</h1>
+<p>
+Petualangan kuis 3D! Bantu Luna berlari melewati
+5 dunia, kumpulkan koin, hindari rintangan,
+dan jawab 50 pertanyaan berbagai pelajaran.
+</p>
+<p>
+◀ ▶ Pindah jalur<br>
+⬆ Melompat<br>
+⬇ Merunduk
+</p>
+<button class="primary" onclick="startGame()">
+MULAI PETUALANGAN
+</button>
+<p class="small">
+Game membutuhkan koneksi internet untuk memuat Three.js.
+</p>
+</div>
+
+<div class="panel" id="pausePanel" style="display:none">
+<h1>Game Dijeda</h1>
+<p>Istirahat sebentar!</p>
+<button class="primary" onclick="togglePause()">LANJUTKAN</button>
+</div>
+
+<div class="panel" id="endPanel" style="display:none">
+<div style="font-size:48px">🏆</div>
+<h1 id="endTitle">Permainan Selesai!</h1>
+<p id="endText"></p>
+<button class="primary" onclick="location.reload()">MAIN LAGI</button>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script>
+const questions=[
+["Matematika","12 × 8 = ?",["86","96","108","88"],1],
+["Bahasa Indonesia","Sinonim kata indah adalah ...",["Buruk","Elok","Kasar","Gelap"],1],
+["IPA","Planet Merah adalah ...",["Venus","Jupiter","Mars","Saturnus"],2],
+["IPS","Ibu kota Indonesia adalah ...",["Bandung","Jakarta","Medan","Surabaya"],1],
+["Informatika","HTML digunakan untuk ...",["Struktur web","Edit video","Mengolah angka","Menggambar"],0],
+["Matematika","144 ÷ 12 = ...",["10","11","12","14"],2],
+["Bahasa Inggris","Library artinya ...",["Laboratorium","Perpustakaan","Kelas","Kantin"],1],
+["IPA","Organ pemompa darah adalah ...",["Paru-paru","Ginjal","Jantung","Lambung"],2],
+["Sejarah","Proklamasi Indonesia pada ...",["17 Agustus 1945","10 November 1945","1 Juni 1945","28 Oktober 1928"],0],
+["Informatika","Kepanjangan CPU adalah ...",["Central Processing Unit","Computer Personal User","Control Program Utility","Central Power Unit"],0],
+["Matematika","25% dari 200 adalah ...",["25","40","50","75"],2],
+["Bahasa Indonesia","Kalimat tanya diakhiri ...",["Titik","Koma","Seru","Tanya"],3],
+["IPA","Air membeku pada suhu ...",["0°C","10°C","50°C","100°C"],0],
+["IPS","Kegiatan membeli barang disebut ...",["Produksi","Distribusi","Konsumsi","Ekspor"],2],
+["Informatika","CSS digunakan untuk ...",["Tampilan web","Database","Speaker","Email"],0],
+["Matematika","Bilangan prima terkecil adalah ...",["0","1","2","3"],2],
+["Bahasa Inggris","Lawan kata big adalah ...",["Tall","Small","Long","Wide"],1],
+["IPA","Sumber energi utama bumi adalah ...",["Bulan","Matahari","Angin","Batu bara"],1],
+["PPKn","Dasar negara Indonesia adalah ...",["UUD","Pancasila","Proklamasi","Bhinneka"],1],
+["Informatika","Contoh browser adalah ...",["Chrome","Word","Paint","Calculator"],0],
+["Matematika","7² = ...",["14","21","49","77"],2],
+["Bahasa Indonesia","Gagasan utama disebut ...",["Ide pokok","Penjelas","Amanat","Judul"],0],
+["IPA","Proses tumbuhan membuat makanan ...",["Respirasi","Fotosintesis","Evaporasi","Adaptasi"],1],
+["IPS","ASEAN berada di kawasan ...",["Eropa","Afrika","Asia Tenggara","Asia Timur"],2],
+["Informatika","8 bit sama dengan ...",["Byte","Kilobyte","Megabyte","Gigabyte"],0],
+["Matematika","Keliling persegi sisi 6 cm ...",["12","18","24","36"],2],
+["Bahasa Inggris","Good morning digunakan pada ...",["Pagi","Siang","Malam","Tengah malam"],0],
+["IPA","Hewan pemakan tumbuhan disebut ...",["Karnivora","Herbivora","Omnivora","Insektivora"],1],
+["Sejarah","Sumpah Pemuda diperingati ...",["2 Mei","17 Agustus","28 Oktober","10 November"],2],
+["Informatika","Ekstensi HTML adalah ...",[".mp3",".html",".jpg",".exe"],1],
+["Matematika","3/4 dalam desimal adalah ...",["0,25","0,5","0,75","1,25"],2],
+["Bahasa Indonesia","Tokoh utama cerita disebut ...",["Figuran","Protagonis","Latar","Alur"],1],
+["IPA","Alat mengukur suhu adalah ...",["Barometer","Termometer","Speedometer","Higrometer"],1],
+["IPS","Penghasil barang disebut ...",["Konsumen","Produsen","Distributor","Pembeli"],1],
+["Informatika","JavaScript membuat web menjadi ...",["Interaktif","Berkarat","Tertutup","Offline"],0],
+["Matematika","15 + 27 = ...",["32","40","42","52"],2],
+["Bahasa Inggris","Bentuk lampau go adalah ...",["Goed","Gone","Went","Going"],2],
+["IPA","Bagian tumbuhan penyerap air ...",["Daun","Bunga","Akar","Buah"],2],
+["PPKn","Bhinneka Tunggal Ika artinya ...",["Bersatu","Berbeda-beda tetap satu","Rajin","Maju"],1],
+["Informatika","Alat memasukkan teks ke komputer ...",["Monitor","Keyboard","Speaker","Proyektor"],1],
+["Matematika","1 kilometer sama dengan ... meter",["10","100","1.000","10.000"],2],
+["Bahasa Indonesia","Pantun biasanya terdiri dari ... baris",["2","3","4","5"],2],
+["IPA","Perubahan air menjadi uap disebut ...",["Mencair","Menguap","Membeku","Mengembun"],1],
+["IPS","Peta menunjukkan ...",["Lokasi tempat","Rasa makanan","Waktu tidur","Musik"],0],
+["Informatika","Penyimpanan online disebut ...",["Cloud storage","Motherboard","Processor","Keyboard"],0],
+["Matematika","Sudut siku-siku adalah ... derajat",["45","60","90","180"],2],
+["Bahasa Inggris","Beautiful artinya ...",["Cepat","Cantik/indah","Kecil","Mahal"],1],
+["IPA","Gaya yang menarik benda ke bumi ...",["Gesek","Magnet","Gravitasi","Pegas"],2],
+["Sejarah","Pencipta lagu Indonesia Raya ...",["W.R. Supratman","Ismail Marzuki","Ibu Sud","C. Simanjuntak"],0],
+["Informatika","Perangkat menampilkan gambar ...",["Mouse","Monitor","CPU","Scanner"],1]
+];
+
+let scene,camera,renderer,player,clock;
+let lanes=[-2,0,2],lane=1;
+let score=0,coins=0,lives=3,qIndex=0;
+let timeLeft=300,worldIndex=0;
+let running=false,paused=false,questionOpen=false;
+let soundOn=true,jumping=false,ducking=false,vy=0;
+let objects=[],spawnTimer=0,runElapsed=0,gameTimer;
+
+function $(id){return document.getElementById(id)}
+function material(color){
+return new THREE.MeshStandardMaterial({color:color,roughness:.8})
+}
+function box(w,h,d,color,x,y,z){
+let m=new THREE.Mesh(
+new THREE.BoxGeometry(w,h,d),material(color)
+);
+m.position.set(x,y,z);
+m.castShadow=true;
+scene.add(m);
+return m;
+}
+
+function init3D(){
+scene=new THREE.Scene();
+scene.background=new THREE.Color(0xc5e7ff);
+scene.fog=new THREE.Fog(0xc5e7ff,18,65);
+
+camera=new THREE.PerspectiveCamera(
+65,innerWidth/innerHeight,.1,100
+);
+camera.position.set(0,5.1,9);
+camera.lookAt(0,1,-5);
+
+renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+$("game").appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x8b78aa,2));
+
+let sun=new THREE.DirectionalLight(0xffffff,2.2);
+sun.position.set(-5,10,6);
+sun.castShadow=true;
+scene.add(sun);
+
+box(12,.3,100,0xf6d8ed,0,-.25,-35);
+
+for(let x of [-4,4]){
+for(let z=0;z>-90;z-=8){
+box(.35,2,.35,0x9b6b55,x,1,z);
+let crown=new THREE.Mesh(
+new THREE.SphereGeometry(1.15,12,10),
+material(0x7ecb9a)
+);
+crown.position.set(x,2.5,z);
+scene.add(crown);
+}
+}
+
+for(let x of [-1,1]){
+box(.045,.02,100,0xffffff,x,-.05,-35);
+}
+
+makePlayer();
+clock=new THREE.Clock();
+animate();
+}
+
+function makePlayer(){
+player=new THREE.Group();
+scene.add(player);
+player.position.set(0,0,2);
+
+let body=new THREE.Mesh(
+new THREE.CapsuleGeometry(.38,.75,5,10),
+material(0xff9fca)
+);
+body.position.y=1.15;
+player.add(body);
+
+let head=new THREE.Mesh(
+new THREE.SphereGeometry(.43,18,14),
+material(0xffd7bd)
+);
+head.position.set(0,2,0);
+player.add(head);
+
+let hair=new THREE.Mesh(
+new THREE.SphereGeometry(.46,18,12,0,Math.PI*2,0,Math.PI*.62),
+material(0x65422f)
+);
+hair.position.set(0,2.1,.03);
+player.add(hair);
+
+let ribbon1=new THREE.Mesh(
+new THREE.BoxGeometry(.22,.08,.08),
+material(0xff5fa8)
+);
+ribbon1.position.set(-.22,2.47,0);
+player.add(ribbon1);
+
+let ribbon2=ribbon1.clone();
+ribbon2.position.x=.22;
+player.add(ribbon2);
+
+let limbs=[];
+for(let x of [-.48,.48]){
+let arm=new THREE.Mesh(
+new THREE.CapsuleGeometry(.12,.48,4,8),
+material(0xffd7bd)
+);
+arm.position.set(x,1.25,0);
+player.add(arm);
+limbs.push(arm);
+}
+
+for(let x of [-.2,.2]){
+let leg=new THREE.Mesh(
+new THREE.CapsuleGeometry(.14,.5,4,8),
+material(0x8061b8)
+);
+leg.position.set(x,.48,0);
+player.add(leg);
+limbs.push(leg);
+}
+player.userData.limbs=limbs;
+}
+
+function spawn(type){
+let laneNo=Math.floor(Math.random()*3);
+let group=new THREE.Group();
+group.position.set(lanes[laneNo],0,-55);
+scene.add(group);
+
+if(type==="coin"){
+let c=new THREE.Mesh(
+new THREE.TorusGeometry(.38,.13,8,18),
+material(0xffd34f)
+);
+c.position.y=1.2;
+group.add(c);
+group.userData.kind="coin";
+}else{
+let height=type==="low"?.65:1.7;
+let ob=new THREE.Mesh(
+new THREE.BoxGeometry(.95,height,.8),
+material(type==="low"?0xff7b9f:0x8b6de0)
+);
+ob.position.y=height/2;
+group.add(ob);
+group.userData.kind=type;
+}
+
+group.userData.lane=laneNo;
+objects.push(group);
+}
+
+function move(dir){
+if(!running||paused||questionOpen)return;
+lane=Math.max(0,Math.min(2,lane+dir));
+player.position.x=lanes[lane];
+}
+
+function jump(){
+if(!running||paused||questionOpen||jumping)return;
+jumping=true;vy=8;sfx(520,.09);
+}
+
+function duck(){
+if(!running||paused||questionOpen)return;
+ducking=true;
+player.scale.y=.55;
+setTimeout(()=>{
+ducking=false;
+if(player)player.scale.y=1;
+},650);
+}
+
+function animate(){
+requestAnimationFrame(animate);
+if(!renderer)return;
+
+let dt=Math.min(clock.getDelta(),.04);
+
+if(running&&!paused&&!questionOpen){
+runElapsed+=dt;
+spawnTimer+=dt;
+
+if(spawnTimer>1.15){
+spawnTimer=0;
+let r=Math.random();
+spawn(r<.42?"coin":r<.72?"high":"low");
+}
+
+if(jumping){
+player.position.y+=vy*dt;
+vy-=19*dt;
+if(player.position.y<=0){
+player.position.y=0;
+jumping=false;
+}
+}
+
+let t=runElapsed*11;
+player.userData.limbs.forEach((l,i)=>{
+l.rotation.x=Math.sin(t+(i%2)*Math.PI)*.7;
+});
+
+objects.forEach(o=>{
+o.position.z+=17*dt;
+if(o.userData.kind==="coin")o.rotation.y+=dt*4;
+});
+
+for(let o of objects){
+if(!o.userData.hit&&o.position.z>1.2&&o.position.z<3&&o.userData.lane===lane){
+o.userData.hit=true;
+
+if(o.userData.kind==="coin"){
+coins++;score+=10;updateHud();sfx(850,.12);
+}
+else if(!jumping&&!ducking){
+hit();
+}
+}
+}
+
+objects=objects.filter(o=>{
+if(o.position.z>8){
+scene.remove(o);return false;
+}
+return true;
+});
+
+camera.position.x+=(player.position.x*.18-camera.position.x)*dt*3;
+camera.lookAt(player.position.x*.15,1,-5);
+}
+
+renderer.render(scene,camera);
+}
+
+function hit(){
+lives--;
+updateHud();
+sfx(130,.25);
+toast("Aduh! Rintangan terkena!");
+if(lives<=0)endGame(false);
+}
+
+function updateHud(){
+$("score").textContent=score;
+$("coins").textContent=coins;
+$("lives").textContent=lives;
+$("world").textContent=(worldIndex+1)+"/5";
+}
+
+function sfx(freq=440,duration=.12){
+if(!soundOn)return;
+try{
+let ctx=new(window.AudioContext||window.webkitAudioContext)();
+let o=ctx.createOscillator();
+let g=ctx.createGain();
+o.connect(g);g.connect(ctx.destination);
+o.frequency.value=freq;
+g.gain.setValueAtTime(.09,ctx.currentTime);
+g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+duration);
+o.start();o.stop(ctx.currentTime+duration);
+}catch(e){}
+}
+
+function say(text){
+if(!soundOn||!window.speechSynthesis)return;
+speechSynthesis.cancel();
+let u=new SpeechSynthesisUtterance(text);
+u.lang="id-ID";u.rate=.92;
+speechSynthesis.speak(u);
+}
+
+function toggleSound(){
+soundOn=!soundOn;
+$("soundBtn").textContent=soundOn?"🔊":"🔇";
+if(!soundOn)speechSynthesis.cancel();
+}
+
+function toast(text){
+$("toast").textContent=text;
+$("toast").style.display="block";
+setTimeout(()=>$("toast").style.display="none",1400);
+}
+
+function showQuestion(){
+if(qIndex>=questions.length){
+endGame(true);return;
+}
+
+questionOpen=true;
+let q=questions[qIndex];
+
+$("qmeta").textContent=
+q[0].toUpperCase()+" • PERTANYAAN "+(qIndex+1)+"/50";
+
+$("question").textContent=q[1];
+$("feedback").textContent="";
+$("bar").style.width=(qIndex/50*100)+"%";
+$("answers").innerHTML="";
+
+q[2].forEach((a,i)=>{
+let b=document.createElement("button");
+b.textContent=String.fromCharCode(65+i)+". "+a;
+b.onclick=()=>answer(i);
+$("answers").appendChild(b);
+});
+
+$("quiz").style.display="block";
+say(q[1]);
+}
+
+function answer(i){
+if(!questionOpen)return;
+
+let q=questions[qIndex];
+let correct=i===q[3];
+questionOpen=false;
+
+if(correct){
+score+=100;coins+=3;
+$("feedback").textContent="BENAR! +100 skor dan +3 koin 🎉";
+$("feedback").style.color="#23956b";
+sfx(880,.18);
+say("Jawaban benar! Hebat!");
+}else{
+lives--;
+$("feedback").textContent="Belum tepat. Jawaban: "+q[2][q[3]];
+$("feedback").style.color="#d45b78";
+sfx(180,.22);
+say("Belum tepat. Tetap semangat.");
+}
+
+updateHud();
+qIndex++;
+$("bar").style.width=(qIndex/50*100)+"%";
+
+if(lives<=0){
+setTimeout(()=>{
+$("quiz").style.display="none";
+endGame(false);
+},1300);
+return;
+}
+
+setTimeout(()=>{
+$("quiz").style.display="none";
+
+if(qIndex%10===0&&qIndex<50){
+worldIndex++;
+changeWorld();
+toast("Selamat datang di dunia "+worldIndex);
+}
+
+if(qIndex>=50){
+endGame(true);
+}else{
+toast("Lanjut berlari!");
+setTimeout(()=>{
+if(running&&!paused)showQuestion();
+},6500);
+}
+},1500);
+}
+
+function changeWorld(){
+let colors=[
+0xc5e7ff,0xffd7b5,0xffc7e3,
+0x9ce5ed,0x171b4c
+];
+scene.background=new THREE.Color(colors[worldIndex]);
+scene.fog.color=new THREE.Color(colors[worldIndex]);
+}
+
+function startGame(){
+$("overlay").style.display="none";
+if(!renderer)init3D();
+running=true;paused=false;
+clock.start();
+say("Selamat datang di Dream Run Academy!");
+
+gameTimer=setInterval(()=>{
+if(running&&!paused&&!questionOpen){
+timeLeft--;
+$("time").textContent=
+String(Math.floor(timeLeft/60)).padStart(2,"0")+":"+
+String(timeLeft%60).padStart(2,"0");
+
+if(timeLeft<=0)endGame(false);
+}
+},1000);
+
+setTimeout(()=>{
+if(running)showQuestion();
+},12000);
+}
+
+function togglePause(){
+if(!running)return;
+paused=!paused;
+
+if(paused){
+$("overlay").style.display="flex";
+$("intro").style.display="none";
+$("pausePanel").style.display="block";
+$("endPanel").style.display="none";
+speechSynthesis.cancel();
+}else{
+$("overlay").style.display="none";
+$("pausePanel").style.display="none";
+}
+}
+
+function endGame(win){
+if(!running)return;
+
+running=false;paused=true;
+clearInterval(gameTimer);
+$("quiz").style.display="none";
+$("overlay").style.display="flex";
+$("intro").style.display="none";
+$("pausePanel").style.display="none";
+$("endPanel").style.display="block";
+
+$("endTitle").textContent=win?"KAMU JUARA! 🏆":"PERMAINAN SELESAI";
+
+$("endText").textContent=
+"Skor akhir: "+score+
+" • Koin: "+coins+
+" • Pertanyaan: "+qIndex+"/50. "+
+(win?"Luar biasa! Semua dunia berhasil dilewati.":"Coba lagi dan kumpulkan skor lebih tinggi!");
+
+say(win?"Selamat! Kamu berhasil!":"Permainan selesai.");
+}
+
+document.addEventListener("keydown",e=>{
+if(e.key==="ArrowLeft"||e.key.toLowerCase()==="a")move(-1);
+if(e.key==="ArrowRight"||e.key.toLowerCase()==="d")move(1);
+if(e.key==="ArrowUp"||e.key===" ")jump();
+if(e.key==="ArrowDown"||e.key.toLowerCase()==="s")duck();
+if(e.key==="Escape")togglePause();
+});
+
+window.addEventListener("resize",()=>{
+if(camera&&renderer){
+camera.aspect=innerWidth/innerHeight;
+camera.updateProjectionMatrix();
+renderer.setSize(innerWidth,innerHeight);
+}
+});
+</script>
+</body>
+</html>
